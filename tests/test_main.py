@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch, Mock, MagicMock
 import sys
 import json
+import os
 from io import StringIO
 import argparse
 import requests
@@ -91,6 +92,7 @@ class TestCLIApplication(unittest.TestCase):
     @patch('sys.argv')
     @patch('requests.get')
     @patch('builtins.print')
+    @patch.dict(os.environ, {}, clear=True)
     def test_verbose_and_report_together(self, mock_print, mock_get, mock_argv):
         """Test verbose flag with report argument."""
         # Mock command line arguments
@@ -105,9 +107,12 @@ class TestCLIApplication(unittest.TestCase):
 
         result = main()
 
-        # Verify both verbose message and JSON were printed
+        # Verify verbose messages, environment variables, and JSON were printed
         expected_calls = [
             unittest.mock.call("Verbose mode enabled"),
+            unittest.mock.call("Environment variables:"),
+            unittest.mock.call("  VERBOSE: Not set"),
+            unittest.mock.call("  H1_API_TOKEN: Not set"),
             unittest.mock.call(json.dumps(self.mock_response_data, indent=2))
         ]
         mock_print.assert_has_calls(expected_calls)
@@ -117,6 +122,7 @@ class TestCLIApplication(unittest.TestCase):
     @patch('sys.argv')
     @patch('requests.get')
     @patch('builtins.print')
+    @patch.dict(os.environ, {}, clear=True)
     def test_short_flags(self, mock_print, mock_get, mock_argv):
         """Test short flag versions (-v, -r)."""
         # Mock command line arguments with short flags
@@ -131,9 +137,12 @@ class TestCLIApplication(unittest.TestCase):
 
         result = main()
 
-        # Verify both verbose message and JSON were printed
+        # Verify verbose messages, environment variables, and JSON were printed
         expected_calls = [
             unittest.mock.call("Verbose mode enabled"),
+            unittest.mock.call("Environment variables:"),
+            unittest.mock.call("  VERBOSE: Not set"),
+            unittest.mock.call("  H1_API_TOKEN: Not set"),
             unittest.mock.call(json.dumps(self.mock_response_data, indent=2))
         ]
         mock_print.assert_has_calls(expected_calls)
@@ -167,11 +176,88 @@ class TestCLIApplication(unittest.TestCase):
         # argparse exits with code 0 for --help
         self.assertEqual(cm.exception.code, 0)
 
+    @patch('sys.argv')
+    @patch('builtins.print')
+    def test_missing_report_argument(self, mock_print, mock_argv):
+        """Test behavior when --report argument is missing."""
+        # Mock command line arguments without --report
+        mock_argv.__getitem__ = lambda self, index: ['cli_app.py'][index]
+        mock_argv.__len__ = lambda self: 1
+
+        result = main()
+
+        # Verify error message was printed and exit code is 1
+        mock_print.assert_called_with("Error: --report argument is required")
+        self.assertEqual(result, 1)
+
+    @patch('sys.argv')
+    @patch('requests.get')
+    @patch('builtins.print')
+    @patch.dict(os.environ, {'H1_API_TOKEN': 'test_token_123'}, clear=True)
+    def test_api_token_header(self, mock_print, mock_get, mock_argv):
+        """Test that API_TOKEN header is added when H1_API_TOKEN env var is set."""
+        # Mock command line arguments
+        mock_argv.__getitem__ = lambda self, index: ['cli_app.py', '--report', '123456'][index]
+        mock_argv.__len__ = lambda self: 3
+
+        # Mock successful HTTP response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.mock_response_data
+        mock_get.return_value = mock_response
+
+        result = main()
+
+        # Verify the API was called with correct headers
+        mock_get.assert_called_once_with(
+            'https://hackerone.com/reports/123456.json',
+            headers={'API_TOKEN': 'test_token_123'}
+        )
+
+        self.assertEqual(result, 0)
+
+    @patch('sys.argv')
+    @patch('requests.get')
+    @patch('builtins.print')
+    @patch.dict(os.environ, {'H1_API_TOKEN': 'test_token_123', 'VERBOSE': '1'}, clear=True)
+    def test_verbose_mode_with_env_vars(self, mock_print, mock_get, mock_argv):
+        """Test verbose mode shows environment variables."""
+        # Mock command line arguments
+        mock_argv.__getitem__ = lambda self, index: ['cli_app.py', '--report', '231502v'][index]
+        mock_argv.__len__ = lambda self: 3
+
+        # Mock successful HTTP response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.mock_response_data
+        mock_get.return_value = mock_response
+
+        result = main()
+
+        # Verify verbose output includes environment variables
+        expected_calls = [
+            unittest.mock.call("Verbose mode enabled"),
+            unittest.mock.call("Environment variables:"),
+            unittest.mock.call("  VERBOSE: 1"),
+            unittest.mock.call("  H1_API_TOKEN: Set"),
+            unittest.mock.call(json.dumps(self.mock_response_data, indent=2))
+        ]
+        mock_print.assert_has_calls(expected_calls)
+
+        # Verify API called with token
+        mock_get.assert_called_once_with(
+            'https://hackerone.com/reports/231502v.json',
+            headers={'API_TOKEN': 'test_token_123'}
+        )
+
+        self.assertEqual(result, 0)
+
 
 class TestIntegration(unittest.TestCase):
     """Integration tests that test the full flow."""
 
     @patch('requests.get')
+    @patch.dict(os.environ, {}, clear=True)
     def test_full_workflow_integration(self, mock_get):
         """Test the complete workflow with mocked HTTP requests."""
         # Mock successful HTTP response
@@ -194,6 +280,7 @@ class TestIntegration(unittest.TestCase):
 
             # Verify verbose message is in output
             self.assertIn("Verbose mode enabled", output)
+            self.assertIn("Environment variables:", output)
 
             # Verify JSON is in output
             self.assertIn("integration_test", output)

@@ -27,7 +27,7 @@ def main():
     parser.add_argument(
         "--report",
         "-r",
-        help="Enable verbose output"
+        help="Report ID to fetch"
     )
     
     args = parser.parse_args()
@@ -35,14 +35,34 @@ def main():
     verbose = args.verbose or os.environ.get("VERBOSE")
     if verbose:
         print("Verbose mode enabled")
+        # Print environment variables used for debugging
+        print(f"Environment variables:")
+        print(f"  VERBOSE: {os.environ.get('VERBOSE', 'Not set')}")
+        print(f"  H1_API_TOKEN: {'Set' if os.environ.get('H1_API_TOKEN') else 'Not set'}")
 
-    res = requests.get(f'https://hackerone.com/reports/{args.report}.json')
-    if res.status_code == 200:
-        print(json.dumps(res.json(),indent=2))
-    else:
-        print("Failed to fetch report")
-        if verbose:
-            print('Response:' + res.text)
+    # Check if report ID is provided
+    if not args.report:
+        print("Error: --report argument is required")
+        return 1
+
+    # Prepare headers
+    headers = {}
+    api_token = os.environ.get('H1_API_TOKEN')
+    if api_token:
+        headers['API_TOKEN'] = api_token
+
+    try:
+        res = requests.get(f'https://hackerone.com/reports/{args.report}.json', headers=headers)
+        if res.status_code == 200:
+            print(json.dumps(res.json(),indent=2))
+        else:
+            print("Failed to fetch report")
+            if verbose:
+                print('Response:' + res.text)
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed: {e}")
+        return 1
+    
     return 0
 
 
