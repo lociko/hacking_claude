@@ -4,7 +4,10 @@ Main CLI application entry point.
 """
 
 import argparse
+import json
+import os
 import sys
+import requests
 
 
 def main():
@@ -21,13 +24,25 @@ def main():
         action="store_true", 
         help="Enable verbose output"
     )
+    parser.add_argument(
+        "--report",
+        "-r",
+        help="Enable verbose output"
+    )
     
     args = parser.parse_args()
     
-    if args.verbose:
+    verbose = args.verbose or os.environ.get("VERBOSE")
+    if verbose:
         print("Verbose mode enabled")
-    
-    print("Hello from Python CLI!")
+
+    res = requests.get(f'https://hackerone.com/reports/{args.report}.json')
+    if res.status_code == 200:
+        print(json.dumps(res.json(),indent=2))
+    else:
+        print("Failed to fetch report")
+        if verbose:
+            print('Response:' + res.text)
     return 0
 
 
