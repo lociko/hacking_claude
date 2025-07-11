@@ -4,9 +4,11 @@ Unit tests for the CLI application.
 """
 
 import unittest
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch, Mock, MagicMock, mock_open
 import sys
 import json
+import os
+import tempfile
 from io import StringIO
 import argparse
 import requests
@@ -166,6 +168,100 @@ class TestCLIApplication(unittest.TestCase):
 
         # argparse exits with code 0 for --help
         self.assertEqual(cm.exception.code, 0)
+
+    @patch('sys.argv')
+    @patch('requests.get')
+    @patch('builtins.open', new_callable=mock_open)
+    @patch('builtins.print')
+    def test_output_to_file(self, mock_print, mock_file, mock_get, mock_argv):
+        """Test saving report to JSON file."""
+        # Mock command line arguments
+        mock_argv.__getitem__ = lambda self, index: ['cli_app.py', '--report', '123456', '--output', 'report.json'][index]
+        mock_argv.__len__ = lambda self: 5
+
+        # Mock successful HTTP response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.mock_response_data
+        mock_get.return_value = mock_response
+
+        result = main()
+
+        # Verify the API was called with correct URL
+        mock_get.assert_called_once_with('https://hackerone.com/reports/123456.json')
+
+        # Verify file was opened and written to
+        mock_file.assert_called_once_with('report.json', 'w')
+        expected_json = json.dumps(self.mock_response_data, indent=2)
+        mock_file.return_value.write.assert_called_once_with(expected_json)
+
+        # Verify JSON was NOT printed to stdout when output file is specified
+        mock_print.assert_not_called()
+
+        self.assertEqual(result, 0)
+
+    @patch('sys.argv')
+    @patch('requests.get')
+    @patch('builtins.open', new_callable=mock_open)
+    @patch('builtins.print')
+    def test_output_to_file_with_verbose(self, mock_print, mock_file, mock_get, mock_argv):
+        """Test saving report to JSON file with verbose output."""
+        # Mock command line arguments
+        mock_argv.__getitem__ = lambda self, index: ['cli_app.py', '--verbose', '--report', '123456', '--output', 'report.json'][index]
+        mock_argv.__len__ = lambda self: 6
+
+        # Mock successful HTTP response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.mock_response_data
+        mock_get.return_value = mock_response
+
+        result = main()
+
+        # Verify the API was called with correct URL
+        mock_get.assert_called_once_with('https://hackerone.com/reports/123456.json')
+
+        # Verify file was opened and written to
+        mock_file.assert_called_once_with('report.json', 'w')
+        expected_json = json.dumps(self.mock_response_data, indent=2)
+        mock_file.return_value.write.assert_called_once_with(expected_json)
+
+        # Verify verbose messages were printed
+        expected_calls = [
+            unittest.mock.call("Verbose mode enabled"),
+            unittest.mock.call("Report saved to report.json")
+        ]
+        mock_print.assert_has_calls(expected_calls)
+
+        self.assertEqual(result, 0)
+
+    @patch('sys.argv')
+    @patch('requests.get')
+    @patch('builtins.open', new_callable=mock_open)
+    @patch('builtins.print')
+    def test_short_output_flag(self, mock_print, mock_file, mock_get, mock_argv):
+        """Test using short -o flag for output."""
+        # Mock command line arguments
+        mock_argv.__getitem__ = lambda self, index: ['cli_app.py', '-r', '123456', '-o', 'report.json'][index]
+        mock_argv.__len__ = lambda self: 5
+
+        # Mock successful HTTP response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.mock_response_data
+        mock_get.return_value = mock_response
+
+        result = main()
+
+        # Verify the API was called with correct URL
+        mock_get.assert_called_once_with('https://hackerone.com/reports/123456.json')
+
+        # Verify file was opened and written to
+        mock_file.assert_called_once_with('report.json', 'w')
+        expected_json = json.dumps(self.mock_response_data, indent=2)
+        mock_file.return_value.write.assert_called_once_with(expected_json)
+
+        self.assertEqual(result, 0)
 
 
 class TestIntegration(unittest.TestCase):

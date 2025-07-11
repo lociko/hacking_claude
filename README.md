@@ -42,16 +42,24 @@ python-cli-app
 
 - `--version`: Show version information
 - `--verbose, -v`: Enable verbose output
+- `--report, -r`: HackerOne report ID to fetch
+- `--output, -o`: Output file path to save JSON result
 - `--help, -h`: Show help message
 
 ### Examples
 
 ```bash
-# Basic usage
-python app/main.py
+# Fetch a HackerOne report and print to stdout
+python app/main.py --report 123456
 
-# Verbose mode
-python app/main.py --verbose
+# Fetch a report and save to JSON file
+python app/main.py --report 123456 --output report.json
+
+# Fetch a report with verbose output
+python app/main.py --report 123456 --verbose
+
+# Fetch a report, save to file, and show verbose output
+python app/main.py --report 123456 --output report.json --verbose
 
 # Show version
 python app/main.py --version
