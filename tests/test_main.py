@@ -4,7 +4,7 @@ Unit tests for the CLI application.
 """
 
 import unittest
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch, Mock, MagicMock, mock_open
 import sys
 import json
 from io import StringIO
@@ -166,6 +166,36 @@ class TestCLIApplication(unittest.TestCase):
 
         # argparse exits with code 0 for --help
         self.assertEqual(cm.exception.code, 0)
+
+    @patch('sys.argv')
+    @patch('requests.get')
+    @patch('builtins.print')
+    @patch('builtins.open', new_callable=mock_open)
+    def test_result_file_saving(self, mock_file, mock_print, mock_get, mock_argv):
+        """Test that result is saved to res.json file when fetch is successful."""
+        # Mock command line arguments
+        mock_argv.__getitem__ = lambda self, index: ['cli_app.py', '--report', '123456'][index]
+        mock_argv.__len__ = lambda self: 3
+
+        # Mock successful HTTP response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.mock_response_data
+        mock_get.return_value = mock_response
+
+        result = main()
+
+        # Verify the file was opened for writing
+        mock_file.assert_called_once_with('res.json', 'w')
+        
+        # Verify the JSON was written to the file
+        expected_json = json.dumps(self.mock_response_data, indent=2)
+        mock_file().write.assert_called_once_with(expected_json)
+
+        # Verify the result was also printed to stdout
+        mock_print.assert_called_with(expected_json)
+
+        self.assertEqual(result, 0)
 
 
 class TestIntegration(unittest.TestCase):

@@ -38,7 +38,16 @@ def main():
 
     res = requests.get(f'https://hackerone.com/reports/{args.report}.json')
     if res.status_code == 200:
-        print(json.dumps(res.json(),indent=2))
+        result_data = res.json()
+        formatted_json = json.dumps(result_data, indent=2)
+        print(formatted_json)
+        
+        # Save result to res.json in current directory
+        with open('res.json', 'w') as f:
+            f.write(formatted_json)
+        
+        if verbose:
+            print("Result saved to res.json")
     else:
         print("Failed to fetch report")
         if verbose:
