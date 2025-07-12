@@ -35,4 +35,4 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           model: claude-sonnet-4-20250514
-          allowed_tools: "Bash(pip install -e .),Bash(pytest -n auto),Bash(pytest),Bash(python tests/test_py311_generated/_generate.py),Bash(pyright .),Bash(ruff check),Bash(ruff check --fix),Bash(ruff format),Bash(ruff format --check)"
+          allowed_tools: "Bash(pip install -e .),Bash(pytest)"
